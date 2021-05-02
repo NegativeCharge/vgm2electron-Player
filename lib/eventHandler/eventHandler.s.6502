@@ -1,0 +1,61 @@
+.initEventHandler
+{
+    SEI
+
+    \\ Hook the interval timer
+    LDA &220
+    STA eventHandlerOldEvent
+
+    LDA &221
+    STA eventHandlerOldEvent+1
+
+    LDA #LO(eventHandler)
+    STA &220
+
+    LDA #HI(eventHandler)
+    STA &221
+
+    CLI
+
+    RTS
+}
+
+.eventHandler
+{
+    PHP
+
+    CMP #4                                  ; Start of VSYNC
+    BNE checkIntervalTimerCrossingZeroEvent
+    JSR startOfVsyncEvent
+    JMP done
+
+.checkIntervalTimerCrossingZeroEvent
+    CMP #5                                  ; Interval timer crossing zero
+    BNE checkEscapeConditionDetectedEvent
+    JSR intervalTimerCrossingZeroEvent
+    JMP done
+
+.checkEscapeConditionDetectedEvent
+    CMP #6                                  ; ESCAPE condition detected
+    JSR escapeConditionDetectedEvent
+
+.done
+    PLP
+    JMP (eventHandlerOldEvent)
+}
+
+.startOfVsyncEvent
+{
+    JSR playNote
+    RTS
+}
+
+.intervalTimerCrossingZeroEvent
+{
+    RTS
+}
+
+.escapeConditionDetectedEvent
+{
+    RTS
+}

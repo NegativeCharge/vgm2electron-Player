@@ -1,0 +1,44 @@
+\\ ******************************************************************
+\\ EXOMIZER (compression library)
+\\ ******************************************************************
+
+\\ Compress data using:
+\\ exomizer.exe raw -P0 -c -m 2048 <file.raw> -o <file.exo>
+
+\ ******************************************************************
+\ *	Space reserved for runtime buffers not preinitialised
+\ ******************************************************************
+
+EXO_buffer_len = 2048
+
+\\ Exomiser unpack buffer (must be page aligned
+EXO_buffer_start = Exo_large_buffer_addr
+EXO_buffer_end = EXO_buffer_start + EXO_buffer_len
+
+; -------------------------------------------------------------------
+; This 156 byte table area may be relocated. It may also be clobbered
+; by other data between decrunches.
+; We put this in the BASIC input buffer, which should be harmless on
+; all machines.
+; -------------------------------------------------------------------
+EXO_TABL_SIZE = 156
+exo_tabl_bi  = Exo_small_buffer_addr - EXO_TABL_SIZE
+
+exo_tabl_lo = exo_tabl_bi + 52
+exo_tabl_hi = exo_tabl_bi + 104
+
+\\ Declare ZP vars
+.EXO_zp_src_hi	SKIP 1
+.EXO_zp_src_lo	SKIP 1
+.EXO_zp_src_bi	SKIP 1
+.EXO_zp_bitbuf	SKIP 1
+
+.EXO_zp_len_lo	SKIP 1
+.EXO_zp_len_hi	SKIP 1
+
+.EXO_zp_bits_lo	SKIP 1
+.EXO_zp_bits_hi	SKIP 1
+
+.EXO_zp_dest_hi	SKIP 1
+.EXO_zp_dest_lo	SKIP 1	; dest addr lo
+.EXO_zp_dest_bi	SKIP 1	; dest addr hi

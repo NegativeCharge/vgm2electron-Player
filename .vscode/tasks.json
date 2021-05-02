@@ -1,0 +1,41 @@
+{
+    "version": "0.1.0",
+    "command": "cmd",
+    "isShellCommand": true,
+    "showOutput": "always",
+    "echoCommand": true,
+    "suppressTaskName": true,
+    "args": [
+        "/C"
+    ],
+    "tasks": [
+        {
+            "taskName": "vgm2electronPlayer.ssd",
+            "problemMatcher": {
+                "owner": "6502",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}"
+                ],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            },
+            "args": [
+                "make.bat"
+            ],
+            "isBuildCommand": true
+        },
+        {
+            "taskName": "Run 'vgm2electronPlayer.ssd' in Emulator",
+            "isTestCommand": true,
+            "args": [
+                "Elkulator.exe -disc vgm2electronPlayer.ssd"
+            ]
+        }
+    ]
+}

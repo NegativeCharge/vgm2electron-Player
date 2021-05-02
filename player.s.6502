@@ -1,0 +1,391 @@
+\ Variables
+Exo_addr = &880
+Exo_small_buffer_addr = &440
+Exo_large_buffer_addr = &5000
+Player_addr = &1100
+Screen_addr = &5800
+
+\ Includes
+ORG &60
+GUARD &9F
+
+\ Header Files
+INCLUDE ".\lib\eventHandler\eventHandler.h.6502"
+INCLUDE ".\lib\exomizer\v2.0.9\exomizer.h.6502"
+INCLUDE ".\player.h.6502"
+
+CLEAR 0,&FFFF
+ORG Exo_addr
+.exo_start
+	INCLUDE ".\lib\exomizer\v2.0.9\exomizer.s.6502"
+.exo_end
+
+SAVE "EXO", exo_start, exo_end
+
+\ ******************************************************************
+\ *	Memory Info
+\ ******************************************************************
+
+PRINT "------------"
+PRINT "Exomizer"
+PRINT "------------"
+PRINT "CODE size =", ~exo_end-exo_start
+PRINT "------------"
+PRINT "HIGH WATERMARK =", ~P%
+PRINT "FREE =", ~exo_start+exo_end
+PRINT "------------"
+
+CLEAR 0, Screen_addr
+GUARD Screen_addr
+ORG Player_addr
+
+.player_start
+
+    \ Constants
+    INCLUDE ".\lib\constants.h.6502"
+
+    \ Load exomizer into memory
+    LDA #LO(exomizer_file_name)           ; Load Exomizer
+    STA file_name + 0
+    LDA #HI(exomizer_file_name)
+    STA file_name + 1
+
+    LDA #LO(Exo_addr)
+    STA file_address + 0
+    LDA #HI(Exo_addr)
+    STA file_address + 1
+
+    JSR loadFile
+
+    \ Load track into memory
+    LDA eventFileNumber
+    ASL A:ASL A             ; track_filenumber * 4 bytes per filename
+
+    \ Set osfile param block
+	CLC
+	ADC #LO(track_filenames)
+	STA file_name + 0
+	LDA #HI(track_filenames)
+	ADC #0
+	STA file_name + 1
+
+    LDA #LO(Track_addr)
+    STA file_address + 0
+    LDA #HI(Track_addr)
+    STA file_address + 1
+
+    JSR loadFile
+
+    LDX #LO(Track_addr)
+    LDY #HI(Track_addr)
+
+    \\ Initialize Exomizer
+    JSR exo_init_decruncher
+
+    \\ Machine Detection 
+    LDA #0
+	LDX #1
+    JSR OSBYTE
+    TXA
+    STA iselk
+
+    BEQ elk                   ; Skip if Electron
+
+    \\ Keyboard to auto-scan.
+    LDA #&0B
+    STA &FE40
+
+    JSR sound_chip_reset
+
+    JMP init_continue
+
+.elk
+
+    LDA #4:LDX #1:JSR OSBYTE
+    LDA #16:LDX #0:JSR OSBYTE               ;  No A to D sampling
+
+    LDA #163
+    LDX #128
+    LDY #1
+    JSR OSBYTE                              ; No Plus 1 irqs etc
+
+    \\ Mode Detection
+    LDA #&87
+    JSR OSBYTE                              ; Read current MODE - returned in Y
+
+    TYA
+    ASL A:ASL A:ASL A
+    PHA
+    ORA #sndon
+    STA elksndon
+    PLA
+    ORA #sndoff
+    STA elksndoff
+
+.init_continue
+
+    JSR initEventHandler
+
+    \ Enable VSync event
+    LDA #14
+    LDX #4
+    JSR OSBYTE                       ; *FX14,4
+
+    RTS
+
+.playNote
+{
+    PHA:TXA:PHA:TYA:PHA 
+
+    \\ Read pitch value
+    JSR exo_get_decrunched_byte
+    BCS endTrack
+
+    CMP last_tone
+    BEQ continue
+
+    STA tone
+
+    LDA iselk
+    CMP #0
+    BNE not_elk
+    
+    JSR elk_play_note
+
+    JMP continue
+
+.not_elk
+    JSR beeb_play_note
+
+.continue
+    LDA tone
+    STA last_tone
+
+    PLA:TYA:PLA:TXA:PLA
+
+    RTS
+}
+
+.endTrack
+{
+    LDA #13
+    LDX #4
+
+    JSR OSBYTE      ; *FX13,4
+
+    \\ Reset old Event handler
+    SEI
+    LDA eventHandlerOldEvent
+    STA &220
+    LDA eventHandlerOldEvent+1
+    STA &221
+    CLI 
+
+    RTS
+}
+
+.loadFile
+{
+    \\ Set osfile param block
+    LDA file_name
+    STA file_params + 0
+    LDA file_name + 1
+    STA file_params + 1
+
+    LDA file_address
+    STA file_params + 2
+    LDA file_address + 1
+    STA file_params + 3
+
+    LDA #0
+    STA file_params + 6
+
+    \\ Issue osfile call
+    LDX #LO(file_params)
+    LDY #HI(file_params)
+    LDA #&FF
+    JSR OSFILE
+
+    RTS
+}
+
+.elk_play_note
+{
+    LDA tone
+
+    CMP #&00
+    BNE turn_on_sound
+    LDA #&FF
+    JSR soundoff
+    JMP continue
+
+.turn_on_sound
+    JSR soundon
+.continue
+    STA &FE06
+        
+    RTS
+}
+
+.soundon
+{
+    LDX elksndon
+    STX &FE07
+    RTS
+}
+
+.soundoff
+{
+    LDX elksndoff
+    STX &FE07
+    RTS
+}
+
+.beeb_play_note
+{
+    LDA tone
+    CMP #&00
+    BNE beeb_continue
+
+    ; ==== Set Volume ====
+    LDA #%11011111                     ; LCC1VVVV
+    JSR sound_chip_write               ; ch vol
+    
+    ; ==== Zero Tone ====
+    LDA #%1100000
+    JSR sound_chip_write
+
+    LDA #%0000000
+    JSR sound_chip_write
+
+    RTS
+    
+.beeb_continue
+    ; A = value that you would write to &FE06 on an Elk
+    CLC
+    ADC #1
+    PHA
+    ASL A
+    ASL A
+    AND #&0F
+    ORA #&C0
+
+    JSR sound_chip_write ; low 4 bits of frequency
+    PLA
+    LSR A
+    LSR A
+    JSR sound_chip_write ; high 6 bits of frequency
+
+    ; ==== Set Volume ====
+
+    LDA #%11010000                  ; LCC1VVVV
+    JSR sound_chip_write            ; ch vol
+
+    RTS
+}
+
+.sound_chip_write
+{
+    LDX #255
+    STX &FE43
+    STA &FE4f
+    INX
+    STX &FE40
+    LDA &FE40
+    ORA #8
+    STA &FE40
+    RTS ; 21 bytes
+}
+
+; Reset SN76489 sound chip to a default (silent) state
+.sound_chip_reset
+{
+    LDA #&FF
+    STA &FE43
+
+    \\ Zero volume on all channels
+    LDA #%10011111
+    JSR sound_chip_write
+    LDA #%10111111
+    JSR sound_chip_write
+    LDA #%11011111
+    JSR sound_chip_write
+    LDA #%11111111
+    JSR sound_chip_write
+    RTS
+}
+
+.exomizer_file_name
+    EQUS "$.EXO", 13	
+
+.track_filenames
+    EQUS "T01", 13
+    EQUS "T02", 13
+    EQUS "T03", 13
+    EQUS "T04", 13
+    EQUS "T05", 13
+    EQUS "T06", 13
+    EQUS "T07", 13
+    EQUS "T08", 13
+    EQUS "T09", 13
+    EQUS "T10", 13
+    EQUS "T11", 13
+    EQUS "T12", 13
+    EQUS "T13", 13
+    EQUS "T14", 13
+    EQUS "T15", 13
+    EQUS "T16", 13
+
+    \ Include Libraries
+    INCLUDE ".\lib\eventHandler\eventHandler.s.6502"
+
+.player_end
+
+SAVE "PLAYER", player_start, player_end
+
+\ ******************************************************************
+\ *	Memory Info
+\ ******************************************************************
+
+PRINT "---------------"
+PRINT "PLAYER"
+PRINT "---------------"
+PRINT "CODE size =", ~player_end-player_start
+PRINT "---------------"
+PRINT "HIGH WATERMARK =", ~P%
+PRINT "FREE =", ~player_start+player_end
+PRINT "---------------"
+
+Track_addr = Player_addr + player_start + player_end
+
+\ ******************************************************************
+\ * Supporting Files
+\ ******************************************************************
+
+PUTFILE "BOOT","!BOOT",&FFFF
+PUTBASIC "PROMPT","PROMPT"
+
+\ ******************************************************************
+\ * Track Data
+\ ******************************************************************
+
+PUTFILE "tracks/01.exo", "$.T01", Track_addr
+PUTFILE "tracks/02.exo", "$.T02", Track_addr
+\PUTFILE "tracks/03.exo", "$.T03", Track_addr
+\PUTFILE "tracks/04.exo", "$.T04", Track_addr
+\PUTFILE "tracks/05.exo", "$.T05", Track_addr
+\PUTFILE "tracks/06.exo", "$.T06", Track_addr
+\PUTFILE "tracks/07.exo", "$.T07", Track_addr
+\PUTFILE "tracks/08.exo", "$.T08", Track_addr
+\PUTFILE "tracks/09.exo", "$.T09", Track_addr
+\PUTFILE "tracks/10.exo", "$.T10", Track_addr
+\PUTFILE "tracks/11.exo", "$.T11", Track_addr
+\PUTFILE "tracks/12.exo", "$.T12", Track_addr
+\PUTFILE "tracks/13.exo", "$.T13", Track_addr
+\PUTFILE "tracks/14.exo", "$.T14", Track_addr
+\PUTFILE "tracks/15.exo", "$.T15", Track_addr
+\PUTFILE "tracks/16.exo", "$.T16", Track_addr
+\PUTFILE "tracks/17.exo", "$.T17", Track_addr
+\PUTFILE "tracks/18.exo", "$.T18", Track_addr
+\PUTFILE "tracks/19.exo", "$.T19", Track_addr
+\PUTFILE "tracks/20.exo", "$.T20", Track_addr

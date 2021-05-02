@@ -1,0 +1,9 @@
+MODE 4
+PRINT "Enter a track number: "
+A=INKEY(500)
+IF A<=0 TrackNum=1
+IF A>48 AND A<58 THEN TrackNum=A-48
+PRINT "Playing track: ";TrackNum
+
+?&60=TrackNum-1
+*RUN PLAYER

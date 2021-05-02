@@ -1,0 +1,11 @@
+\\ Params block for osfile command
+.file_params		SKIP 18
+.file_name          SKIP 2
+.file_address       SKIP 2
+
+.iselk              SKIP 1
+.elksndon           SKIP 1
+.elksndoff          SKIP 1
+
+.tone            SKIP 1
+.last_tone       SKIP 1
