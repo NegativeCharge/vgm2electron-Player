@@ -12,6 +12,6 @@ No frills interrupt-driven player for vgm2electron binaries
 - A constructed .SSD can be found in the disc
 - Please submit pull requests to enhance the code.  It's my first 6502 project, so less than optimal.
 
-#vgm2electron 
+## vgm2electron 
 
 vgm2electron by @simondotm is located here: https://github.com/simondotm/vgm2electron 
