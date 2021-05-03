@@ -173,6 +173,20 @@ ORG Player_addr
 
     JSR OSBYTE      ; *FX13,4
 
+    LDA iselk
+    CMP #0
+    BNE not_elk
+    
+    LDA #&FF
+    JSR soundoff
+
+    JMP continue
+
+.not_elk
+    JSR sound_chip_reset
+
+.continue
+
     \\ Reset old Event handler
     SEI
     LDA eventHandlerOldEvent
