@@ -7,5 +7,7 @@
 .elksndon           SKIP 1
 .elksndoff          SKIP 1
 
-.tone            SKIP 1
-.last_tone       SKIP 1
+.tone               SKIP 1
+.last_tone          SKIP 1
+
+.addr               SKIP 2

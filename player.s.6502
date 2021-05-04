@@ -195,7 +195,46 @@ ORG Player_addr
     STA &221
     CLI 
 
-    RTS
+    JMP reset
+}
+
+.reset
+{
+    LDA #0
+    LDX #1
+    JSR OSBYTE          ; Read machine type
+    
+    TXA
+    BEQ resetElk        ; Jump if &00=Electron
+    LDA #&7F
+    STA &FE4E
+    JMP (&FFFC)         ; Turn off SysVIA, jump to RESET
+
+.resetElk
+    CLC
+    LDA &FFFC
+    ADC #25
+    STA addr+0          ; Find RESET+25
+    LDA &FFFD
+    ADC #0
+    STA addr+1
+    
+    \ The following is a copy of the first 22 bytes of the RESET code
+    LDA #&40
+    STA &0D00           ; Set null NMI routine
+    SEI
+    CLD
+    LDX #&FF
+    TXS                 ; Disable IRQs, set to Binary, clear the stack
+    INX
+    STX &FE00
+    STX &028D           ; Reset the ULA, set ResetType=PowerOn
+    LDA #&F8
+    STA &FE05           ; Set up the ULA
+    
+    \ Now fake that the ULA is in power-on state
+    LDA #2
+    JMP (addr)          ; A='ULA power on', jump into startup code
 }
 
 .loadFile
